@@ -1,5 +1,9 @@
 // Loading the pre-processed aorta data and sampling the volume solution.
 
+/** The simulation stores pressure in dyn/cm²; the page shows it in mmHg (1 mmHg = 1333.22 dyn/cm²). */
+export const DYN_PER_MMHG = 1333.22;
+const MMHG_ARRAYS = ['pressure', 'average_pressure'];
+
 async function fetchBytes(url, onProgress) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Could not load ${url} (HTTP ${res.status})`);
@@ -57,6 +61,9 @@ export async function loadModel(base, name, onProgress = () => {}) {
     o += n * 2;
   }
 
+  for (const a of MMHG_ARRAYS) { const v = arrays[a]; for (let i = 0; i < v.length; i++) v[i] /= DYN_PER_MMHG; }
+  for (const a of meta.arrays) if (MMHG_ARRAYS.includes(a.name)) a.ranges = a.ranges.map((r) => r.map((x) => x / DYN_PER_MMHG));
+
   // ---- grid ----
   const g = meta.grid, [nx, ny, nz] = g.dims, N = nx * ny * nz, na = g.nactive;
   const sdf = new Int8Array(gbuf, 0, N);
@@ -78,6 +85,7 @@ export async function loadModel(base, name, onProgress = () => {}) {
     vx: ch.velocity0, vy: ch.velocity1, vz: ch.velocity2,
     p: ch.pressure, ap: ch.average_pressure, as: ch.average_speed,
   };
+  for (const c of [grid.p, grid.ap]) for (let i = 0; i < c.length; i++) c[i] /= DYN_PER_MMHG;
   const b = meta.bounds;
   const center = [(b[0] + b[1]) / 2, (b[2] + b[3]) / 2, (b[4] + b[5]) / 2];
   const diag = Math.hypot(b[1] - b[0], b[3] - b[2], b[5] - b[4]);

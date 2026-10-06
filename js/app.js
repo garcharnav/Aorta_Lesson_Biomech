@@ -30,7 +30,10 @@ const el = (tag, attrs = {}, ...kids) => {
 // stream tracer and are not shown in the Properties panel.
 const STREAM_FIXED = { vectors: 'velocity', direction: 'BOTH', maxSteps: 9000, maxLength: 100, terminalSpeed: 1e-12 };
 
-const UNITS = { pressure: 'dyn/cm²', average_pressure: 'dyn/cm²', velocity: 'cm/s', average_speed: 'cm/s', vWSS: 'dyn/cm²' };
+// Units of the arrays in the files. Pressures are converted from dyn/cm² to mmHg when the data load.
+const UNITS = { pressure: 'mmHg', average_pressure: 'mmHg', velocity: 'cm/s', average_speed: 'cm/s', vWSS: 'dyn/cm²' };
+/** Array name with its unit, for menus, legends and tables, e.g. "pressure (mmHg)". */
+const flabel = (f) => (f.unit ? `${f.name} (${f.unit})` : f.name);
 
 export function fmt(v) {
   if (v == null || Number.isNaN(v)) return 'nan';
@@ -100,7 +103,7 @@ function sourceFields(model) {
     ['average_pressure', 1, (r) => r.ap], ['average_speed', 1, (r) => r.as], ['vWSS', 3, () => [0, 0, 0]],
   ];
   const m = new Map();
-  for (const [name, ncomp, at] of defs) m.set(name, { name, ncomp, at, surface: () => A[name], range: (c) => metaRange(name, c), base: true });
+  for (const [name, ncomp, at] of defs) m.set(name, { name, ncomp, at, unit: UNITS[name], surface: () => A[name], range: (c) => metaRange(name, c), base: true });
   return m;
 }
 
@@ -857,7 +860,7 @@ function syncToolbar() {
   selC.disabled = !ready;
   selC.innerHTML = '';
   selC.append(el('option', { value: '' }, 'Solid Color'));
-  if (ready) for (const f of nodeFields(n).values()) selC.append(el('option', { value: f.name }, f.name));
+  if (ready) for (const f of nodeFields(n).values()) selC.append(el('option', { value: f.name }, flabel(f)));
   selC.value = ready && n.display.colorBy ? n.display.colorBy : '';
   const f = ready && n.display.colorBy ? nodeFields(n).get(n.display.colorBy) : null;
   selComp.innerHTML = '';
@@ -973,8 +976,8 @@ function renderCalcProps(n, body) {
     setEdit(n, 'expression', expr.value); validate();
   };
   body.append(el('div', { class: 'prop full' }, expr), msg);
-  const sc = el('select', { 'aria-label': 'Insert a scalar array' }, el('option', { value: '' }, 'Scalars'), [...pf.values()].filter((f) => f.ncomp === 1).map((f) => el('option', { value: f.name }, f.name)));
-  const vc = el('select', { 'aria-label': 'Insert a vector array' }, el('option', { value: '' }, 'Vectors'), [...pf.values()].filter((f) => f.ncomp === 3).map((f) => el('option', { value: f.name }, f.name)));
+  const sc = el('select', { 'aria-label': 'Insert a scalar array' }, el('option', { value: '' }, 'Scalars'), [...pf.values()].filter((f) => f.ncomp === 1).map((f) => el('option', { value: f.name }, flabel(f))));
+  const vc = el('select', { 'aria-label': 'Insert a vector array' }, el('option', { value: '' }, 'Vectors'), [...pf.values()].filter((f) => f.ncomp === 3).map((f) => el('option', { value: f.name }, flabel(f))));
   const quote = (s) => (/^[A-Za-z_][A-Za-z0-9_]*$/.test(s) ? s : `"${s}"`);
   sc.addEventListener('change', () => { if (sc.value) insert(quote(sc.value)); sc.value = ''; });
   vc.addEventListener('change', () => { if (vc.value) insert(quote(vc.value)); vc.value = ''; });
@@ -1028,7 +1031,7 @@ function renderDisplayProps(n) {
   repr.value = d.repr;
   repr.addEventListener('change', () => setDisplay(n, 'repr', repr.value));
   b.append(prow('Representation', repr));
-  const col = el('select', {}, el('option', { value: '' }, 'Solid Color'), [...nodeFields(n).values()].map((f) => el('option', { value: f.name }, f.name)));
+  const col = el('select', {}, el('option', { value: '' }, 'Solid Color'), [...nodeFields(n).values()].map((f) => el('option', { value: f.name }, flabel(f))));
   col.value = d.colorBy || '';
   col.addEventListener('change', () => { setDisplay(n, 'colorBy', col.value || null); renderProps(); });
   b.append(prow('Coloring', col));
@@ -1123,7 +1126,7 @@ function renderInfo() {
     if (n.type === 'stream') ranges = (f.ncomp === 1 ? [0] : [0, 1, 2]).map((c) => nodeRange(n, f, c));
     else if (f.base) { const a = m.meta.arrays.find((x) => x.name === f.name); ranges = a.ranges.slice(0, f.ncomp); }
     else ranges = (f.ncomp === 1 ? [0] : [0, 1, 2]).map((c) => f.range(c));
-    arr.append(el('tr', {}, el('td', {}, f.name), el('td', {}, 'double'), el('td', {}, ranges.map((r) => `[${fmt(r[0])}, ${fmt(r[1])}]`).join(', '))));
+    arr.append(el('tr', {}, el('td', {}, flabel(f)), el('td', {}, 'double'), el('td', {}, ranges.map((r) => `[${fmt(r[0])}, ${fmt(r[1])}]`).join(', '))));
   }
   wrap.append(el('div', {}, el('h3', {}, 'Data Arrays'), arr));
   const bt = el('table');
@@ -1157,7 +1160,7 @@ function legendData(model) {
   }
   return [...seen.values()];
 }
-const legendTitle = (f, lut) => (f.ncomp === 3 ? `${f.name} ${lut.comp}` : f.name);
+const legendTitle = (f, lut) => (f.ncomp === 3 ? `${f.name} ${lut.comp}` : f.name) + (f.unit ? ` (${f.unit})` : '');
 function ticks(lo, hi) { return [0, 0.25, 0.5, 0.75, 1].map((t) => lo + (hi - lo) * t); }
 function renderLegends() {
   for (const v of Object.values(S.views)) {
@@ -1329,9 +1332,10 @@ function probeAt(view, e) {
     }
     for (const f of fields.values()) {
       const v = vals(f);
-      const unit = f.base ? UNITS[f.name] || '' : '';
-      if (f.ncomp === 1) rows.push([f.name, `${fmt(v)} ${unit}`]);
-      else rows.push([`${f.name} (size)`, `${fmt(Math.hypot(v[0], v[1], v[2]))} ${unit}`]);
+      const unit = f.unit || '';
+      const show = (x) => (Math.abs(x) < 0.01 ? '0' : fmt(x)); // e.g. blood at the wall does not move
+      if (f.ncomp === 1) rows.push([f.name, `${show(v)} ${unit}`]);
+      else rows.push([`${f.name} (size)`, `${show(Math.hypot(v[0], v[1], v[2]))} ${unit}`]);
     }
     const tt = $('#tooltip');
     tt.innerHTML = '';
@@ -1517,19 +1521,13 @@ const api = {
   S, nodesOf, fmt, onChange: (f) => listeners.add(f), select: selectNode, setEdit, flashInlet, inletSeed, status,
   fields: nodeFields, applyAll, openFiles,
   cameraPos: (model) => S.views[model].camera.position.toArray(),
+  /** [min, max] pressure in mmHg over the whole model, or null before the file is read. */
+  pressureRange: (model) => (S.models[model] ? S.models[model].meta.arrays.find((a) => a.name === 'pressure').ranges[0] : null),
   toScreen(model, p) {
     const v = S.views[model], q = v3(p).project(v.camera), r = v.canvas.getBoundingClientRect();
     return [r.left + (q.x + 1) / 2 * r.width, r.top + (1 - q.y) / 2 * r.height];
   },
   archPlane: (model) => S.models[model] && S.models[model].meta.arch_plane,
-  sampleCalc(node) {
-    // compare the calculator result with pressure/1333 at a few surface points
-    if (!node.out || !node.out.field || node.out.field.ncomp !== 1) return null;
-    const s = node.out.field.surface(), p = nodeFields(node.parent).get('pressure');
-    if (!p) return null;
-    const ps = p.surface(), idx = [0, Math.floor(s.length / 3), Math.floor(s.length / 2), s.length - 1];
-    return idx.map((i) => s[i] / (ps[i] / 1333));
-  },
 };
 window.aortaLab = api;
 init();

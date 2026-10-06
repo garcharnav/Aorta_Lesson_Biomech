@@ -1,13 +1,14 @@
 // The worksheet panel: the handout's steps and questions, answer boxes, and live progress checks.
 
 const STORE = 'aortaLab.worksheet.v1';
+/** Normal average blood pressure for healthy adults (mmHg), drawn as the shaded band in the step 2 chart. */
+const HEALTHY_RANGE = [65, 90];
 const load = () => { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch { return {}; } };
 const save = (d) => { try { localStorage.setItem(STORE, JSON.stringify(d)); return true; } catch { return false; } };
 
 const QUESTIONS = {
   q1: 'What is different about the healthy and diseased geometries?',
-  q2: 'Are the pressure values large?',
-  q2b: 'What is different about the pressure of the two aorta models? How does pressure change in the diseased aorta with coarctation?',
+  q2b: 'What is different about the pressure of the two aorta models? How does pressure change in the diseased aorta with coarctation? How do both compare with the healthy adult range?',
   q3: 'What do you notice about the velocities in the two different models?',
   q4: 'What do you notice about the streamlines between the two models? How is the blood flow different in each model?',
 };
@@ -36,23 +37,18 @@ const HTML = `
       ${box('q1')}
     </li>
     <li class="step numbered" data-step="2">
-      <p class="q"><b class="kw">Pressure:</b> Change the data you are looking at to pressure using the ${ui('Coloring')} menu in the toolbar. Are the values large?</p>
-      ${box('q2')}
+      <p class="q"><b class="kw">Pressure:</b> Make sure both models are colored by <b>pressure (mmHg)</b> in the ${ui('Coloring')} menu. Pressure is shown in millimeters of mercury (mmHg), the unit doctors use for blood pressure.</p>
       <ul class="checks" data-checks="pressure"></ul>
-      <p>The values are quite high! They are in units of dynes/cm². Doctors usually look at blood pressure in mmHg, and it should be between 70 and 100 mmHg. We will convert them to units of mmHg using the ${ui('Calculator')}.</p>
-      <ol class="sub">
-        <li>Click <i>healthy.vtu</i> in the Pipeline Browser, then click ${ui('Calculator')}. Change <b>Result Array Name</b> to <code class="ex">Pressure (mmHg)</code>, and in the expression box underneath write <code class="ex">pressure/1333</code>. Click ${ui('Apply')}. Repeat for <i>diseased.vtu</i>.
-          <p class="note">1 mmHg = 1333 dynes/cm², so dividing by 1333 changes the units to mmHg.</p>
-          <ul class="checks" data-checks="calc"></ul>
-        </li>
-        <li><span class="q">What is different about the pressure of the two aorta models? How does pressure change in the diseased aorta with coarctation?</span>
-          <p class="note">Tip: turn on ${ui('Hover probe')} to read the value under your mouse.</p>
-          ${box('q2b')}
-        </li>
-      </ol>
+      <figure class="pchart">
+        <div id="pchart"></div>
+        <figcaption>The shaded band is the normal average blood pressure for healthy adults, ${HEALTHY_RANGE[0]} to ${HEALTHY_RANGE[1]} mmHg. Each bar runs from the lowest to the highest pressure in that model.</figcaption>
+      </figure>
+      <p class="q">${QUESTIONS.q2b}</p>
+      <p class="note">Tip: turn on ${ui('Hover probe')} to read the pressure under your mouse.</p>
+      ${box('q2b')}
     </li>
     <li class="step numbered" data-step="3">
-      <p class="q">Now we will look at <b class="kw">velocities</b>. Select <i>Calculator1</i> in the Pipeline Browser and click ${ui('Clip')}. Align the plane so it cuts the aorta lengthwise, like slicing a straw in half along its length. Click ${ui('Apply')}. <b>Make sure velocity is selected</b> in the ${ui('Coloring')} menu! Then <b>uncheck</b> ${ui('Show Plane')} to view the model. Repeat for the diseased model.</p>
+      <p class="q">Now we will look at <b class="kw">velocities</b>. Select <i>healthy.vtu</i> in the Pipeline Browser and click ${ui('Clip')}. Align the plane so it cuts the aorta lengthwise, like slicing a straw in half along its length. Click ${ui('Apply')}. <b>Make sure velocity is selected</b> in the ${ui('Coloring')} menu! Then <b>uncheck</b> ${ui('Show Plane')} to view the model. Repeat for <i>diseased.vtu</i>.</p>
       <p class="note">To tilt the plane, drag the tip of its arrow. Or rotate the view until you look straight at the side of the arch, then click ${ui('Camera Normal')}.<br>
         <button type="button" class="hintbtn" data-hint="plane">Show me the plane from the handout</button></p>
       <ul class="checks" data-checks="clip"></ul>
@@ -63,7 +59,7 @@ const HTML = `
     <li class="step numbered" data-step="4">
       <p class="q">Next we will look at <b class="kw">streamlines</b>. These show us where the blood is flowing.</p>
       <ol class="sub">
-        <li>Select <i>Calculator1</i> again and click the ${ui('Stream Tracer')} button.</li>
+        <li>Select <i>healthy.vtu</i> again and click the ${ui('Stream Tracer')} button.</li>
         <li>Position the sphere around the inlet of the aorta, where blood comes in from the heart. Drag the sphere, or use ${ui('Pick on model (P)')}.
           <br><button type="button" class="hintbtn" data-hint="inlet">Where is the inlet?</button><button type="button" class="hintbtn" data-hint="seed">Put the sphere at the inlet for me</button></li>
         <li>Change <b>Number Of Points</b> to <code class="ex">200</code>. Click ${ui('Apply')}, then set ${ui('Coloring')} to velocity. Repeat for the diseased model.</li>
@@ -139,11 +135,6 @@ export function initLesson(root, app) {
   // ----- progress checks
   const S = app.S, models = ['healthy', 'diseased'], label = { healthy: 'healthy', diseased: 'diseased' };
   const nodes = (m, type) => app.nodesOf(m).filter((n) => n.applied && (!type || n.type === type));
-  const calcOK = (m) => nodes(m, 'calculator').some((n) => {
-    if (!/mmhg/i.test(n.props.resultName)) return false;
-    const r = app.sampleCalc(n);
-    return r && r.every((x) => Math.abs(x - 1) < 0.01);
-  });
   const clipOK = (m) => nodes(m, 'clip').some((n) => n.display.colorBy === 'velocity');
   const planeHidden = (m) => nodes(m, 'clip').some((n) => !n.edit.showPlane);
   const nearInlet = (n) => {
@@ -153,8 +144,7 @@ export function initLesson(root, app) {
   const streams = (m) => nodes(m, 'stream');
   const CHECKS = {
     open: () => models.map((m) => [`${label[m]}.vtu opened and applied`, nodes(m, 'source').length > 0]),
-    pressure: () => [['A model is colored by pressure', S.nodes.some((n) => n.applied && n.visible && n.display.colorBy === 'pressure')]],
-    calc: () => models.map((m) => [`Pressure (mmHg) made for the ${label[m]} model`, calcOK(m)]),
+    pressure: () => models.map((m) => [`${label[m]} model colored by pressure`, app.nodesOf(m).some((n) => n.applied && n.visible && n.display.colorBy === 'pressure')]),
     clip: () => models.flatMap((m) => [[`${label[m]} model clipped and colored by velocity`, clipOK(m)], [`${label[m]} plane hidden`, planeHidden(m)]]),
     stream: () => models.flatMap((m) => [
       [`${label[m]}: seed sphere at the inlet`, streams(m).some(nearInlet)],
@@ -163,10 +153,46 @@ export function initLesson(root, app) {
       [`${label[m]}: model opacity 0.2`, app.nodesOf(m).some((n) => n.applied && n.visible && n.type !== 'stream' && n.display.opacity <= 0.25)],
     ]),
   };
-  const STEP_KEYS = { 0: ['open'], 1: [], 2: ['pressure', 'calc'], 3: ['clip'], 4: ['stream'] };
-  const STEP_Q = { 0: [], 1: ['q1'], 2: ['q2', 'q2b'], 3: ['q3'], 4: ['q4'] };
+  const STEP_KEYS = { 0: ['open'], 1: [], 2: ['pressure'], 3: ['clip'], 4: ['stream'] };
+  const STEP_Q = { 0: [], 1: ['q1'], 2: ['q2b'], 3: ['q3'], 4: ['q4'] };
+
+  // ----- pressure chart: each model's pressure range against the healthy adult range
+  const chartBox = root.querySelector('#pchart');
+  let chartKey = '';
+  function drawChart() {
+    const ranges = models.map((m) => app.pressureRange(m));
+    const key = JSON.stringify(ranges);
+    if (key === chartKey) return;
+    chartKey = key;
+    const W = 320, L = 10, R = 310, lo = 40, hi = 120;
+    const x = (v) => L + ((Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo)) * (R - L);
+    const rows = [
+      { label: 'Healthy adults, normal average', range: HEALTHY_RANGE, cls: 'ref' },
+      { label: 'healthy.vtu', range: ranges[0], cls: 'healthy' },
+      { label: 'diseased.vtu', range: ranges[1], cls: 'diseased' },
+    ];
+    const rowH = 46, top = 4, axisY = top + rows.length * rowH + 2, H = axisY + 34;
+    const one = (v) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
+    let g = '';
+    for (let t = lo; t <= hi; t += 10) {
+      g += `<line class="grid" x1="${x(t)}" x2="${x(t)}" y1="${top + 20}" y2="${axisY}"/>`;
+      if (t % 20 === 0) g += `<text class="tick" x="${x(t)}" y="${axisY + 15}" text-anchor="middle">${t}</text>`;
+    }
+    g += `<line class="axis" x1="${L}" x2="${R}" y1="${axisY}" y2="${axisY}"/>`;
+    g += `<text class="axt" x="${(L + R) / 2}" y="${axisY + 31}" text-anchor="middle">Pressure (mmHg)</text>`;
+    rows.forEach((r, i) => {
+      const y = top + i * rowH;
+      g += `<text class="rl" x="${L}" y="${y + 13}">${r.label}</text>`;
+      if (!r.range) { g += `<text class="wait" x="${L}" y="${y + 35}">Open the files to see this model</text>`; return; }
+      const [a, b] = r.range, x0 = x(a), w = Math.max(5, x(b) - x0), text = `${one(a)} to ${one(b)}`;
+      g += `<text class="val" x="${R}" y="${y + 13}" text-anchor="end">${text}</text>`;
+      g += `<rect class="bar ${r.cls}" x="${x0}" y="${y + 22}" width="${w}" height="16" rx="3"><title>${r.label}: ${text} mmHg</title></rect>`;
+    });
+    chartBox.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Pressure ranges: healthy adults ${HEALTHY_RANGE[0]} to ${HEALTHY_RANGE[1]} mmHg${ranges[0] ? `; healthy model ${one(ranges[0][0])} to ${one(ranges[0][1])} mmHg` : ''}${ranges[1] ? `; diseased model ${one(ranges[1][0])} to ${one(ranges[1][1])} mmHg` : ''}">${g}</svg>`;
+  }
 
   function refresh() {
+    drawChart();
     const done = {};
     for (const [key, fn] of Object.entries(CHECKS)) {
       const ul = root.querySelector(`[data-checks="${key}"]`);

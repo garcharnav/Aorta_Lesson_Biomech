@@ -20,6 +20,10 @@
   --viewport-a: #5a5f78;
   --viewport-b: #464b62;
   --focus: #2b63d4;
+  --series-healthy: #2f6fb5;
+  --series-diseased: #ad2639;
+  --band: rgba(36, 128, 74, 0.16);
+  --band-line: #24804a;
   --ok: #24804a;
   --warn: #9a5b00;
   --err: #b3261e;
@@ -34,6 +38,7 @@
     --apply: #4cc17a; --apply-soft: #1d3a29; --aorta: #ec7a8a; --aorta-soft: #3a2228;
     --paper: #1a1e25; --paper-ink: #e9ebef; --viewport-a: #4a4f66; --viewport-b: #383c50; --focus: #8db2ff;
     --ok: #5fd08d; --warn: #e3a64a; --err: #f28b82;
+    --series-healthy: #5a94dc; --series-diseased: #e06476; --band: rgba(95, 208, 141, 0.16); --band-line: #5fd08d;
   }
 }
 :root[data-theme="dark"] {
@@ -43,6 +48,7 @@
   --apply: #4cc17a; --apply-soft: #1d3a29; --aorta: #ec7a8a; --aorta-soft: #3a2228;
   --paper: #1a1e25; --paper-ink: #e9ebef; --viewport-a: #4a4f66; --viewport-b: #383c50; --focus: #8db2ff;
   --ok: #5fd08d; --warn: #e3a64a; --err: #f28b82;
+  --series-healthy: #5a94dc; --series-diseased: #e06476; --band: rgba(95, 208, 141, 0.16); --band-line: #5fd08d;
 }
 
 * { box-sizing: border-box; }
@@ -231,6 +237,19 @@ code.ex { font-family: var(--ui); font-size: 13.5px; font-weight: 700; backgroun
 .checks li.done .tick::after { content: ""; width: 7px; height: 4px; border-left: 2px solid #fff; border-bottom: 2px solid #fff; transform: rotate(-45deg) translate(1px, -1px); }
 .hintbtn { font-family: var(--ui); font-size: 12.5px; font-weight: 600; border: 1px solid var(--line-strong); background: var(--panel); color: var(--ink); border-radius: 4px; padding: 3px 8px; cursor: pointer; margin: 2px 4px 2px 0; }
 .hintbtn:hover { border-color: var(--aorta); color: var(--aorta); }
+.pchart { margin: 10px 0 12px; padding: 10px 10px 8px; border: 1px solid var(--line); border-radius: 4px; font-family: var(--ui); }
+.pchart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.pchart .grid { stroke: var(--line); stroke-width: 1; }
+.pchart .axis { stroke: var(--line-strong); stroke-width: 1; }
+.pchart .tick { fill: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.pchart .axt { fill: var(--muted); font-size: 12px; }
+.pchart .rl { fill: var(--paper-ink); font-size: 13px; font-weight: 600; }
+.pchart .val { fill: var(--paper-ink); font-size: 13px; font-variant-numeric: tabular-nums; }
+.pchart .wait { fill: var(--muted); font-size: 11.5px; font-style: italic; }
+.pchart .bar.ref { fill: var(--band); stroke: var(--band-line); stroke-width: 1.2; stroke-dasharray: 4 3; }
+.pchart .bar.healthy { fill: var(--series-healthy); }
+.pchart .bar.diseased { fill: var(--series-diseased); }
+.pchart figcaption { font-size: 12.5px; line-height: 1.4; color: var(--muted); margin-top: 6px; }
 .finish { border-top: 1px solid var(--line); padding-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-family: var(--ui); }
 .finish button { height: 32px; padding: 0 12px; border-radius: 5px; border: 1px solid var(--line-strong); background: var(--panel); font-weight: 600; cursor: pointer; }
 .finish button.primary { background: var(--aorta); border-color: var(--aorta); color: #fff; }
