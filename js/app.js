@@ -535,14 +535,6 @@ function setViewDirection(code) {
     v.resetCamera();
   }
 }
-function rotateView(deg) {
-  for (const v of camTargets()) {
-    const dir = v.controls.target.clone().sub(v.camera.position).normalize();
-    v.camera.up.applyAxisAngle(dir, THREE.MathUtils.degToRad(-deg));
-    v.camera.lookAt(v.controls.target);
-    v.needs = true;
-  }
-}
 const camTargets = () => (S.link ? Object.values(S.views) : [S.views[S.activeView]]);
 
 function setActiveView(name) {
@@ -861,8 +853,8 @@ function syncToolbar() {
   const n = S.selected;
   const ready = n && n.applied;
   for (const id of ['#btn-calc', '#btn-clip', '#btn-stream']) $(id).disabled = !(ready && isSurfaceType(n));
-  const selC = $('#sel-color'), selComp = $('#sel-comp'), selR = $('#sel-repr');
-  selC.disabled = selR.disabled = !ready;
+  const selC = $('#sel-color'), selComp = $('#sel-comp');
+  selC.disabled = !ready;
   selC.innerHTML = '';
   selC.append(el('option', { value: '' }, 'Solid Color'));
   if (ready) for (const f of nodeFields(n).values()) selC.append(el('option', { value: f.name }, f.name));
@@ -871,7 +863,6 @@ function syncToolbar() {
   selComp.innerHTML = '';
   if (f && f.ncomp === 3) { for (const c of ['Magnitude', 'X', 'Y', 'Z']) selComp.append(el('option', { value: c }, c)); selComp.value = getLut(f.name).comp; selComp.disabled = false; }
   else { selComp.append(el('option', {}, f ? '—' : 'Magnitude')); selComp.disabled = true; }
-  selR.value = ready ? n.display.repr : 'Surface';
 }
 function refreshApplyButton() {
   const any = S.nodes.some((n) => !n.applied || n.dirty);
@@ -963,7 +954,6 @@ function renderProps() {
 
 function renderCalcProps(n, body) {
   const pf = nodeFields(n.parent);
-  body.append(prow('Attribute Type', el('select', { disabled: true }, el('option', {}, 'Point Data'))));
   const name = el('input', { type: 'text', value: n.edit.resultName, 'data-key': 'resultName', 'aria-label': 'Result Array Name' });
   name.addEventListener('input', () => setEdit(n, 'resultName', name.value));
   body.append(prow('Result Array Name', name));
@@ -983,17 +973,6 @@ function renderCalcProps(n, body) {
     setEdit(n, 'expression', expr.value); validate();
   };
   body.append(el('div', { class: 'prop full' }, expr), msg);
-  const keys = ['Clear', '(', ')', '+', '−', '×', '÷', '^', 'mag', 'sqrt', 'abs', 'ln'];
-  const pad = el('div', { class: 'keypad', 'aria-label': 'Calculator keys' });
-  for (const k of keys) {
-    const b = el('button', { type: 'button', title: k === 'Clear' ? 'Clear the expression' : `Insert ${k}` }, k);
-    b.addEventListener('click', () => {
-      if (k === 'Clear') { expr.value = ''; setEdit(n, 'expression', ''); validate(); expr.focus(); return; }
-      insert({ '−': '-', '×': '*', '÷': '/' }[k] || (['mag', 'sqrt', 'abs', 'ln'].includes(k) ? `${k}(` : k));
-    });
-    pad.append(b);
-  }
-  body.append(pad);
   const sc = el('select', { 'aria-label': 'Insert a scalar array' }, el('option', { value: '' }, 'Scalars'), [...pf.values()].filter((f) => f.ncomp === 1).map((f) => el('option', { value: f.name }, f.name)));
   const vc = el('select', { 'aria-label': 'Insert a vector array' }, el('option', { value: '' }, 'Vectors'), [...pf.values()].filter((f) => f.ncomp === 3).map((f) => el('option', { value: f.name }, f.name)));
   const quote = (s) => (/^[A-Za-z_][A-Za-z0-9_]*$/.test(s) ? s : `"${s}"`);
@@ -1004,15 +983,10 @@ function renderCalcProps(n, body) {
 }
 
 function renderClipProps(n, body) {
-  body.append(prow('Clip Type', el('select', { disabled: true }, el('option', {}, 'Plane'))));
-  body.append(el('span', { class: 'pnote' }, 'Plane Parameters'));
   body.append(checkInput(n, 'showPlane', 'Show Plane'));
-  body.append(prow('Origin', trio(n, 'origin')));
-  body.append(prow('Normal', trio(n, 'normal')));
   const btns = el('div', { class: 'btnrow' });
   const setN = (v) => setEdit(n, 'normal', v);
-  for (const [label, v] of [['X Normal', [1, 0, 0]], ['Y Normal', [0, 1, 0]], ['Z Normal', [0, 0, 1]]]) btns.append(el('button', { type: 'button', class: 'pbtn', onclick: () => setN(v) }, label));
-  btns.append(el('button', { type: 'button', class: 'pbtn', title: 'Point the plane at you, matching the current view', onclick: () => {
+  btns.append(el('button', { type: 'button', class: 'pbtn', title: 'Turn the plane to face you, so you see the cut side', onclick: () => {
     const v = S.views[n.model], d = v.camera.position.clone().sub(v.controls.target).normalize();
     setN([+d.x.toFixed(5), +d.y.toFixed(5), +d.z.toFixed(5)]);
   } }, 'Camera Normal'));
@@ -1031,8 +1005,7 @@ function renderClipProps(n, body) {
   });
   slide.addEventListener('change', () => { base = null; slide.value = 0; });
   body.append(prow('Slide plane', slide));
-  body.append(el('p', { class: 'pnote' }, 'Tip: drag the plane in the view to slide it, drag the arrow tip to tilt it.'));
-  body.append(checkInput(n, 'invert', 'Invert'));
+  body.append(el('p', { class: 'pnote' }, 'Drag the plane in the view to slide it, and drag the arrow tip to tilt it. Camera Normal turns the plane to face you, so you see the cut side.'));
 }
 
 function renderStreamProps(n, body) {
@@ -1500,11 +1473,8 @@ function init() {
     const n = S.selected; if (!n || !n.display.colorBy) return;
     const lut = getLut(n.display.colorBy); lut.comp = e.target.value; if (!lut.locked) autoRange(lut.name, true); refreshAllColors(); renderProps(); notify();
   });
-  $('#sel-repr').addEventListener('change', (e) => { if (S.selected) { setDisplay(S.selected, 'repr', e.target.value); renderProps(); } });
   $('#btn-reset').addEventListener('click', () => { for (const v of camTargets()) v.resetCamera(); });
   for (const b of document.querySelectorAll('.tb.ax')) b.addEventListener('click', () => setViewDirection(b.dataset.view));
-  $('#btn-rotl').addEventListener('click', () => rotateView(-90));
-  $('#btn-rotr').addEventListener('click', () => rotateView(90));
   $('#chk-link').addEventListener('change', (e) => { S.link = e.target.checked; if (S.link) syncCameras(S.views[S.activeView]); });
   $('#chk-auto').addEventListener('change', (e) => { S.autoApply = e.target.checked; if (S.autoApply) applyAll(); });
   $('#btn-probe').addEventListener('click', (e) => {
