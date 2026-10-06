@@ -2,7 +2,7 @@
 
 const STORE = 'aortaLab.worksheet.v1';
 /** Normal average blood pressure for healthy adults (mmHg), drawn as the shaded band in the step 2 chart. */
-const HEALTHY_RANGE = [65, 90];
+const HEALTHY_RANGE = [70, 100];
 const load = () => { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch { return {}; } };
 const save = (d) => { try { localStorage.setItem(STORE, JSON.stringify(d)); return true; } catch { return false; } };
 

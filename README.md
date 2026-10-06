@@ -10,12 +10,12 @@ Nothing needs to be installed. The page runs entirely in the browser, and nothin
 | --- | --- |
 | Open the files | **Open** → tick `healthy.vtu` and `diseased.vtu` → **OK** → **Apply** |
 | 1. Compare the geometries | Rotate, zoom and pan both models; the two views move together (**Link cameras**) |
-| 2. Pressure | **Coloring** menu → `pressure (mmHg)`; a chart in the worksheet compares each model's pressure range with a normal adult average of 65–90 mmHg |
+| 2. Pressure | **Coloring** menu → `pressure (mmHg)`; a chart in the worksheet compares each model's pressure range with the normal adult average of 70–100 mmHg |
 | 3. Velocities | **Clip** with a plane students drag, tilt by its arrow, or turn to face them with **Camera Normal**; a slider moves it along its normal; **Show Plane** hides it; colour the cut face by `velocity` |
 | 4. Streamlines | **Stream Tracer**: students only place the seed sphere (drag it or **Pick on model (P)**), set its Radius and Number Of Points, and click Apply |
 | 4d. Opacity | **Styling → Opacity** on the first item in the pipeline |
 
-Array names carry their units everywhere they appear: pressure and average_pressure in mmHg, velocity and average_speed in cm/s, vWSS in dyn/cm². The **Calculator** is still in the toolbar for anyone who wants it, but the worksheet no longer uses it.
+Array names carry their units everywhere they appear: pressure and average_pressure in mmHg, velocity and average_speed in cm/s, vWSS in dyn/cm². The toolbar has no Calculator, since pressures already arrive in mmHg; the Calculator code is still in `js/app.js` and `js/expr.js` if you want to bring the button back.
 
 Also available: Pipeline Browser with eye toggles, Apply / Reset / Delete, Auto Apply, Representation (in the Display section), colour map presets, rescaling, legends, point size and line width, a **Hover probe** that reads values under the mouse, camera buttons (reset, ±X/±Y/±Z), a **Screenshot** button, and side-by-side or single-model layouts.
 
@@ -77,7 +77,7 @@ The script expects point arrays named `pressure`, `velocity`, `average_pressure`
 
 - The cut face and streamlines use the resampled grid, so values inside the vessel are interpolated from 0.25 mm voxels rather than from the original tetrahedra. Peak speeds agree to within about 1 % (96.1 cm/s in the original diseased mesh, 95.9 cm/s on the grid).
 - Streamlines are integrated with fixed-step fourth-order Runge–Kutta (step 0.125 mm) rather than ParaView's adaptive Runge–Kutta 4-5. Point Cloud seeds are random points in the sphere, with a fixed random seed so every student sees the same result.
-- To keep the panels short, some ParaView settings are fixed and hidden. The Clip always uses a plane with Invert on, so Camera Normal shows the cut side, and the Calculator always works on point data. The Stream Tracer always uses velocity, a Point Cloud seed, integration in BOTH directions, Maximum Steps 9000 and Maximum Streamline Length 100 cm. These are set in `STREAM_FIXED` at the top of `js/app.js`.
+- To keep the panels short, some ParaView settings are fixed and hidden. The Clip always uses a plane with Invert on, so Camera Normal shows the cut side. The Stream Tracer always uses velocity, a Point Cloud seed, integration in BOTH directions, Maximum Steps 9000 and Maximum Streamline Length 100 cm. These are set in `STREAM_FIXED` at the top of `js/app.js`.
 - Colour maps are shared by array name across both models, as in ParaView, so the healthy and diseased models are always coloured on the same scale unless the range is changed.
 - The Information tab gives approximate cell and point counts for a clip.
 
@@ -85,4 +85,4 @@ The script expects point arrays named `pressure`, `velocity`, `average_pressure`
 
 Interface inspired by ParaView and by the [WSS LCS Explorer](https://amir-cardiolab.github.io/WSS-topology/) ([source](https://github.com/amir-cardiolab/WSS-topology)). Rendering with [three.js](https://threejs.org). Fonts: Atkinson Hyperlegible Next and Source Serif 4.
 
-The healthy adult band in the step 2 chart (65–90 mmHg) is set by `HEALTHY_RANGE` at the top of `js/lesson.js`.
+The healthy adult band in the step 2 chart is set by `HEALTHY_RANGE` at the top of `js/lesson.js`. It uses 70–100 mmHg, the commonly quoted normal range for mean arterial pressure in adults ([Healthline, medically reviewed](https://www.healthline.com/health/mean-arterial-pressure)).

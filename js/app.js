@@ -855,7 +855,7 @@ function selectNode(node) {
 function syncToolbar() {
   const n = S.selected;
   const ready = n && n.applied;
-  for (const id of ['#btn-calc', '#btn-clip', '#btn-stream']) $(id).disabled = !(ready && isSurfaceType(n));
+  for (const id of ['#btn-clip', '#btn-stream']) $(id).disabled = !(ready && isSurfaceType(n));
   const selC = $('#sel-color'), selComp = $('#sel-comp');
   selC.disabled = !ready;
   selC.innerHTML = '';
@@ -1469,7 +1469,6 @@ function init() {
   $('#btn-apply').addEventListener('click', applyAll);
   $('#btn-resetprops').addEventListener('click', () => S.selected && resetEdits(S.selected));
   $('#btn-delete').addEventListener('click', () => S.selected && deleteNode(S.selected));
-  $('#btn-calc').addEventListener('click', () => addFilter('calculator'));
   $('#btn-clip').addEventListener('click', () => addFilter('clip'));
   $('#btn-stream').addEventListener('click', () => addFilter('stream'));
   $('#sel-color').addEventListener('change', (e) => { if (S.selected) { setDisplay(S.selected, 'colorBy', e.target.value || null); renderProps(); } });
