@@ -26,6 +26,10 @@ const el = (tag, attrs = {}, ...kids) => {
   return e;
 };
 
+// Stream Tracer settings that students don't need to change. They are applied to every
+// stream tracer and are not shown in the Properties panel.
+const STREAM_FIXED = { vectors: 'velocity', direction: 'BOTH', maxSteps: 9000, maxLength: 100, terminalSpeed: 1e-12 };
+
 const UNITS = { pressure: 'dyn/cm²', average_pressure: 'dyn/cm²', velocity: 'cm/s', average_speed: 'cm/s', vWSS: 'dyn/cm²' };
 
 export function fmt(v) {
@@ -563,19 +567,10 @@ const TYPE_LABEL = { source: 'UnstructuredGridRepresentation', calculator: 'Calc
 function defaults(type, model, parent) {
   const m = S.models[model];
   const center = m ? m.center.slice() : [0, 0, 0], diag = m ? m.diag : 10;
-  const b = m ? m.meta.bounds : [0, 1, 0, 1, 0, 1];
   if (type === 'source') return { arrays: true };
   if (type === 'calculator') return { attribute: 'Point Data', resultName: 'Result', expression: '' };
   if (type === 'clip') return { clipType: 'Plane', origin: center, normal: [1, 0, 0], invert: true, showPlane: true };
-  if (type === 'stream') {
-    const vecs = [...nodeFields(parent).values()].filter((f) => f.ncomp === 3).map((f) => f.name);
-    return {
-      vectors: vecs.includes('velocity') ? 'velocity' : vecs[0] || 'velocity',
-      direction: 'BOTH', maxSteps: 2000, maxLength: +diag.toFixed(4), terminalSpeed: 1e-12,
-      seedType: 'Line', center, radius: +(diag / 10).toFixed(4), numPoints: 100, showSphere: true,
-      point1: [b[0], b[2], b[4]], point2: [b[1], b[3], b[5]], resolution: 1000, showLine: true,
-    };
-  }
+  if (type === 'stream') return { center, radius: +(diag / 10).toFixed(4), numPoints: 100, showSphere: true };
 }
 function defaultDisplay(type, parent) {
   const inherit = parent ? parent.display.colorBy : 'pressure';
@@ -654,23 +649,19 @@ async function computeNode(node) {
   } else if (node.type === 'stream') {
     status('Tracing streamlines…');
     await new Promise((r) => setTimeout(r, 30));
-    const seeds = [];
-    if (P.seedType === 'Point Cloud') {
-      const rand = rng(1234567 + Math.round(P.numPoints));
-      const R = Math.max(0, +P.radius), n = Math.max(1, Math.min(5000, Math.round(P.numPoints)));
-      while (seeds.length < n) {
-        const x = rand() * 2 - 1, y = rand() * 2 - 1, z = rand() * 2 - 1;
-        if (x * x + y * y + z * z > 1) continue;
-        seeds.push([P.center[0] + R * x, P.center[1] + R * y, P.center[2] + R * z]);
-      }
-    } else {
-      const n = Math.max(1, Math.min(5000, Math.round(P.resolution)));
-      for (let i = 0; i <= n; i++) { const t = i / n; seeds.push([0, 1, 2].map((c) => P.point1[c] * (1 - t) + P.point2[c] * t)); }
+    // seeds: a point cloud of random points inside the sphere (fixed random seed, so results repeat)
+    const seeds = [], rand = rng(1234567 + Math.round(P.numPoints));
+    const R = Math.max(0, +P.radius), n = Math.max(1, Math.min(5000, Math.round(P.numPoints)));
+    while (seeds.length < n) {
+      const x = rand() * 2 - 1, y = rand() * 2 - 1, z = rand() * 2 - 1;
+      if (x * x + y * y + z * z > 1) continue;
+      seeds.push([P.center[0] + R * x, P.center[1] + R * y, P.center[2] + R * z]);
     }
+    const F = STREAM_FIXED;
     const planes = clipChain(node.parent).map((c) => { const p = clipPlane(c.props); return { n: [p.normal.x, p.normal.y, p.normal.z], d: p.constant }; });
     const lines = traceStreamlines(model.grid, seeds, {
-      maxLength: Math.max(0, +P.maxLength), maxSteps: Math.max(1, Math.round(P.maxSteps)), step: model.grid.h * 0.5,
-      terminalSpeed: Math.max(0, +P.terminalSpeed), direction: P.direction, planes,
+      maxLength: F.maxLength, maxSteps: F.maxSteps, step: model.grid.h * 0.5,
+      terminalSpeed: F.terminalSpeed, direction: F.direction, planes,
     });
     node.out = { lines, nseeds: seeds.length };
     node.actor = new StreamActor(view, model, lines);
@@ -796,7 +787,7 @@ function resetEdits(node) {
   afterChange(true);
 }
 // widget visibility switches act at once, like in ParaView, without needing Apply
-const UI_KEYS = new Set(['showPlane', 'showSphere', 'showLine']);
+const UI_KEYS = new Set(['showPlane', 'showSphere']);
 function setEdit(node, key, value) {
   node.edit[key] = value;
   if (UI_KEYS.has(key) && node.props) node.props[key] = value;
@@ -947,9 +938,6 @@ function markChanged(node) {
     }
     inp.classList.toggle('changed', node.applied && !same(ev, pv));
   }
-  const vis = (sel, on) => { const e = $(sel); if (e) e.hidden = !on; };
-  vis('#pc-params', node.edit.seedType === 'Point Cloud');
-  vis('#line-params', node.edit.seedType === 'Line');
 }
 
 function renderProps() {
@@ -1048,35 +1036,16 @@ function renderClipProps(n, body) {
 }
 
 function renderStreamProps(n, body) {
-  const pf = nodeFields(n.parent);
-  body.append(prow('Vectors', selectInput(n, 'vectors', [...pf.values()].filter((f) => f.ncomp === 3).map((f) => f.name))));
-  body.append(el('span', { class: 'pnote' }, 'Integration Parameters'));
-  body.append(prow('Integration Direction', selectInput(n, 'direction', ['BOTH', 'FORWARD', 'BACKWARD'])));
-  body.append(el('span', { class: 'pnote' }, 'Streamline Parameters'));
-  body.append(prow('Maximum Steps', numInput(n, 'maxSteps', null, { int: true })));
-  const m = S.models[n.model];
-  const range = el('input', { type: 'range', min: 0, max: Math.ceil(m.diag * 4), step: 0.1, value: n.edit.maxLength, 'data-key': 'maxLength', 'aria-label': 'Maximum Streamline Length slider' });
-  range.addEventListener('input', () => setEdit(n, 'maxLength', +range.value));
-  body.append(prow('Maximum Streamline Length', el('div', { class: 'slider' }, range, numInput(n, 'maxLength', null, { label: 'Maximum Streamline Length' }))));
-  body.append(prow('Terminal Speed', numInput(n, 'terminalSpeed')));
-  body.append(el('span', { class: 'pnote' }, 'Seeds'));
-  body.append(prow('Seed Type', selectInput(n, 'seedType', ['Point Cloud', 'Line'])));
-  const pc = el('div', { id: 'pc-params', class: 'pbody', style: 'padding:0' });
-  pc.append(checkInput(n, 'showSphere', 'Show Sphere'));
-  pc.append(prow('Center', trio(n, 'center')));
+  body.append(el('p', { class: 'pnote' }, 'Streamlines start from random points inside the sphere and follow the velocity forward and backward.'));
+  body.append(checkInput(n, 'showSphere', 'Show Sphere'));
+  body.append(prow('Center', trio(n, 'center')));
   const pick = el('button', { type: 'button', class: 'pbtn', title: 'Then click on the model to put the sphere there (shortcut: P)' }, 'Pick on model (P)');
   pick.addEventListener('click', () => startPick(n));
-  pc.append(el('div', { class: 'btnrow' }, pick,
+  body.append(el('div', { class: 'btnrow' }, pick,
     el('button', { type: 'button', class: 'pbtn', onclick: () => setEdit(n, 'center', S.models[n.model].center.slice()) }, 'Reset to Center')));
-  pc.append(prow('Radius', numInput(n, 'radius')));
-  pc.append(prow('Number Of Points', numInput(n, 'numPoints', null, { int: true })));
-  pc.append(el('p', { class: 'pnote' }, 'Drag the sphere in the view to move it.'));
-  const ln = el('div', { id: 'line-params', class: 'pbody', style: 'padding:0' });
-  ln.append(checkInput(n, 'showLine', 'Show Line'));
-  ln.append(prow('Point1', trio(n, 'point1')));
-  ln.append(prow('Point2', trio(n, 'point2')));
-  ln.append(prow('Resolution', numInput(n, 'resolution', null, { int: true })));
-  body.append(pc, ln);
+  body.append(prow('Radius', numInput(n, 'radius')));
+  body.append(prow('Number Of Points', numInput(n, 'numPoints', null, { int: true })));
+  body.append(el('p', { class: 'pnote' }, 'Drag the sphere in the view to move it.'));
 }
 
 function renderDisplayProps(n) {
@@ -1264,20 +1233,12 @@ function updateWidgets() {
     const org = new THREE.Mesh(new THREE.SphereGeometry(m.diag * 0.012, 16, 10), WMAT.handle); org.position.copy(o); org.userData.handle = 'origin';
     v.widgets.add(quad, outline, shaft, cone, tipPick, org);
   }
-  if (n.type === 'stream' && E.seedType === 'Point Cloud' && E.showSphere) {
+  if (n.type === 'stream' && E.showSphere) {
     const sph = new THREE.LineSegments(new THREE.WireframeGeometry(new THREE.SphereGeometry(1, 18, 10)), WMAT.sphere);
     sph.scale.setScalar(Math.max(1e-4, E.radius)); sph.position.set(...E.center);
     const pick = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10), WMAT.pick);
     pick.scale.copy(sph.scale); pick.position.copy(sph.position); pick.userData.handle = 'sphere';
     v.widgets.add(sph, pick);
-  }
-  if (n.type === 'stream' && E.seedType === 'Line' && E.showLine) {
-    const a = v3(E.point1), b = v3(E.point2);
-    v.widgets.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]), WMAT.edge));
-    for (const [p, h] of [[a, 'p1'], [b, 'p2']]) {
-      const s = new THREE.Mesh(new THREE.SphereGeometry(m.diag * 0.014, 14, 8), WMAT.handle); s.position.copy(p); s.userData.handle = h;
-      v.widgets.add(s);
-    }
   }
 }
 
@@ -1305,7 +1266,7 @@ function onViewPointerDown(view, e) {
   if (!n || n.model !== view.name || !view.widgets.children.length) return;
   const hits = rayFrom(view, e).intersectObjects(view.widgets.children, false).filter((h) => h.object.userData.handle);
   if (!hits.length) return;
-  const order = { tip: 0, origin: 1, p1: 1, p2: 1, sphere: 2, plane: 3 };
+  const order = { tip: 0, origin: 1, sphere: 2, plane: 3 };
   hits.sort((a, b) => order[a.object.userData.handle] - order[b.object.userData.handle] || a.distance - b.distance);
   const h = hits[0], handle = h.object.userData.handle;
   const camDir = view.camera.getWorldDirection(new THREE.Vector3());
@@ -1338,8 +1299,6 @@ function onViewPointerMove(view, e) {
       if (drag.handle === 'origin') setEdit(n, 'origin', r5(hit));
       else if (drag.handle === 'tip') { const d = hit.sub(v3(n.edit.origin)); if (d.lengthSq() > 1e-8) setEdit(n, 'normal', r5(d.normalize())); }
       else if (drag.handle === 'sphere') setEdit(n, 'center', r5(hit.add(drag.off)));
-      else if (drag.handle === 'p1') setEdit(n, 'point1', r5(hit));
-      else if (drag.handle === 'p2') setEdit(n, 'point2', r5(hit));
     }
     return;
   }
@@ -1506,7 +1465,7 @@ function openFiles(names) {
 function addFilter(type) {
   const p = S.selected;
   if (!p || !p.applied || !isSurfaceType(p)) return;
-  if (type === 'stream' && ![...nodeFields(p).values()].some((f) => f.ncomp === 3)) { status('Stream Tracer needs a vector array such as velocity.', true); return; }
+  if (type === 'stream' && !nodeFields(p).has(STREAM_FIXED.vectors)) { status('Stream Tracer needs the velocity array.', true); return; }
   const n = createNode(type, p.model, p);
   S.selected = n;
   status(`${n.name} added. Set its properties, then click Apply.`, false, 4000);
@@ -1576,7 +1535,7 @@ function init() {
   window.addEventListener('keydown', (e) => {
     if (e.target.closest('input, textarea, select')) return;
     if (e.key === 'Escape' && S.pick) { endPick(); hideStatus(); }
-    if ((e.key === 'p' || e.key === 'P') && S.selected && S.selected.type === 'stream' && S.selected.edit.seedType === 'Point Cloud') startPick(S.selected);
+    if ((e.key === 'p' || e.key === 'P') && S.selected && S.selected.type === 'stream') startPick(S.selected);
   });
 
   afterChange(true);

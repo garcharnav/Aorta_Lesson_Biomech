@@ -13,7 +13,7 @@ Nothing needs to be installed. The page runs entirely in the browser, and nothin
 | 2. Pressure | **Coloring** menu → `pressure`; **Information** tab shows the data ranges |
 | 2a. Convert to mmHg | **Calculator**: *Result Array Name* `Pressure (mmHg)`, expression `pressure/1333`, **Apply** |
 | 3. Velocities | **Clip** with a draggable plane (origin, normal, X/Y/Z/Camera Normal, Invert, Show Plane); colour the cut face by `velocity` |
-| 4. Streamlines | **Stream Tracer** with Point Cloud or Line seeds, Number Of Points, Maximum Streamline Length, Maximum Steps, Integration Direction; draggable seed sphere and **Pick on model (P)** |
+| 4. Streamlines | **Stream Tracer**: students only place the seed sphere (drag it or **Pick on model (P)**), set its Radius and Number Of Points, and click Apply |
 | 4d. Opacity | **Styling → Opacity** on the first item in the pipeline |
 
 Also available: Pipeline Browser with eye toggles, Apply / Reset / Delete, Auto Apply, Representation (Surface, Surface With Edges, Wireframe, Points, Outline), colour map presets, rescaling, legends, a **Hover probe** that reads values under the mouse, camera buttons (reset, ±X/±Y/±Z, rotate 90°), a **Screenshot** button, and side-by-side or single-model layouts.
@@ -74,6 +74,7 @@ The script expects point arrays named `pressure`, `velocity`, `average_pressure`
 
 - The cut face and streamlines use the resampled grid, so values inside the vessel are interpolated from 0.25 mm voxels rather than from the original tetrahedra. Peak speeds agree to within about 1 % (96.1 cm/s in the original diseased mesh, 95.9 cm/s on the grid).
 - Streamlines are integrated with fixed-step fourth-order Runge–Kutta (step 0.125 mm) rather than ParaView's adaptive Runge–Kutta 4-5. Point Cloud seeds are random points in the sphere, with a fixed random seed so every student sees the same result.
+- To keep the panel short, the Stream Tracer always uses velocity, a Point Cloud seed, integration in BOTH directions, Maximum Steps 9000 and Maximum Streamline Length 100 cm. These are set in `STREAM_FIXED` at the top of `js/app.js`.
 - Colour maps are shared by array name across both models, as in ParaView, so the healthy and diseased models are always coloured on the same scale unless the range is changed.
 - The Information tab gives approximate cell and point counts for a clip.
 

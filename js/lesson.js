@@ -64,9 +64,9 @@ const HTML = `
       <p class="q">Next we will look at <b class="kw">streamlines</b>. These show us where the blood is flowing.</p>
       <ol class="sub">
         <li>Select <i>Calculator1</i> again and click the ${ui('Stream Tracer')} button.</li>
-        <li>Make sure <b>Vectors</b> is velocity. Change <b>Seed Type</b> to <b>Point Cloud</b>, then position the sphere around the inlet of the aorta, where blood comes in from the heart. Drag the sphere, or use ${ui('Pick on model (P)')}.
+        <li>Position the sphere around the inlet of the aorta, where blood comes in from the heart. Drag the sphere, or use ${ui('Pick on model (P)')}.
           <br><button type="button" class="hintbtn" data-hint="inlet">Where is the inlet?</button><button type="button" class="hintbtn" data-hint="seed">Put the sphere at the inlet for me</button></li>
-        <li>Change <b>Number Of Points</b> to <code class="ex">200</code> and <b>Maximum Streamline Length</b> to <code class="ex">20</code>. Click ${ui('Apply')}, then set ${ui('Coloring')} to velocity. Repeat for the diseased model.</li>
+        <li>Change <b>Number Of Points</b> to <code class="ex">200</code>. Click ${ui('Apply')}, then set ${ui('Coloring')} to velocity. Repeat for the diseased model.</li>
         <li>Then change the opacity of the model by clicking on the very first item in your pipeline (<i>healthy.vtu</i> or <i>diseased.vtu</i>). Click its eye so the model is showing, then in the <b>Styling</b> section of Properties, change <b>Opacity</b> to <code class="ex">0.2</code>. Hide the Clip by clicking its eye. That will help you see the streamlines.
           <ul class="checks" data-checks="stream"></ul>
         </li>
@@ -129,7 +129,6 @@ export function initLesson(root, app) {
     if (b.dataset.hint === 'seed') {
       if (!sel || sel.type !== 'stream') { app.status('First select a StreamTracer item in the Pipeline Browser.', true); return; }
       const s = app.inletSeed(sel.model);
-      app.setEdit(sel, 'seedType', 'Point Cloud');
       app.setEdit(sel, 'center', s.center);
       app.setEdit(sel, 'radius', s.radius);
       app.select(sel);
@@ -151,15 +150,15 @@ export function initLesson(root, app) {
     const s = app.inletSeed(n.model), c = n.props.center;
     return Math.hypot(c[0] - s.center[0], c[1] - s.center[1], c[2] - s.center[2]) < s.radius * 1.6;
   };
-  const streams = (m) => nodes(m, 'stream').filter((n) => n.props.seedType === 'Point Cloud');
+  const streams = (m) => nodes(m, 'stream');
   const CHECKS = {
     open: () => models.map((m) => [`${label[m]}.vtu opened and applied`, nodes(m, 'source').length > 0]),
     pressure: () => [['A model is colored by pressure', S.nodes.some((n) => n.applied && n.visible && n.display.colorBy === 'pressure')]],
     calc: () => models.map((m) => [`Pressure (mmHg) made for the ${label[m]} model`, calcOK(m)]),
     clip: () => models.flatMap((m) => [[`${label[m]} model clipped and colored by velocity`, clipOK(m)], [`${label[m]} plane hidden`, planeHidden(m)]]),
     stream: () => models.flatMap((m) => [
-      [`${label[m]}: point cloud at the inlet`, streams(m).some(nearInlet)],
-      [`${label[m]}: 200 points, length 20`, streams(m).some((n) => Math.round(n.props.numPoints) === 200 && Math.abs(n.props.maxLength - 20) < 1e-6)],
+      [`${label[m]}: seed sphere at the inlet`, streams(m).some(nearInlet)],
+      [`${label[m]}: 200 points`, streams(m).some((n) => Math.round(n.props.numPoints) === 200)],
       [`${label[m]}: streamlines colored by velocity`, streams(m).some((n) => n.visible && n.display.colorBy === 'velocity')],
       [`${label[m]}: model opacity 0.2`, app.nodesOf(m).some((n) => n.applied && n.visible && n.type !== 'stream' && n.display.opacity <= 0.25)],
     ]),
